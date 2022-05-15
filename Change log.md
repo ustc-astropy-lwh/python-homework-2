@@ -34,6 +34,6 @@ necessarily, the function `train` and `validate` should add new parameter 'epoch
 # 4.evaluate
 load the model and parameters which have been trained well, add code
 ```
-model.load_state_dict(torch.load('model_best.pth.tar')['state_dict'])
+model.load_state_dict(torch.load('checkpoint.pth.tar')['state_dict'])
 ```
 after `if args.evaluate:` in the `main_worker`
