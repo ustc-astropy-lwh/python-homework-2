@@ -242,7 +242,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        model.load_state_dict(torch.load('model_best.pth.tar')['state_dict'])
+        model.load_state_dict(torch.load('checkpoint.pth.tar')['state_dict'])
         validate_e(val_loader, model, criterion, args)
         return
 
