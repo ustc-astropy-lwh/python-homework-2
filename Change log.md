@@ -31,3 +31,9 @@ val_writer.add_scalar('Acc@5', acc5, epoch)
 val_writer.add_scalar('loss', loss, epoch)
 ```
 necessarily, the function `train` and `validate` should add new parameter 'epoch'
+# 4.evaluate
+load the model and parameters which have been trained well, add code
+```
+model.load_state_dict(torch.load('model_best.pth.tar')['state_dict'])
+```
+after `if args.evaluate:` in the `main_worker`
