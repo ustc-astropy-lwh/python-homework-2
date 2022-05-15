@@ -29,7 +29,7 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR', default='imagenet',
-                    help='path to dataset (default: imagenet)')   
+                    help='path to dataset (default: imagenet)')   ###
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -138,7 +138,6 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)
         model.fc = nn.Sequential(nn.Linear(in_features=512,out_features=200))
-        
     else:
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
@@ -146,7 +145,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
-        
     elif args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
@@ -212,6 +210,7 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
+    # args.data = './tiny-imagenet-200/tiny-imagenet-200'
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -220,7 +219,6 @@ def main_worker(gpu, ngpus_per_node, args):
     train_dataset = datasets.ImageFolder(
         traindir,
         transforms.Compose([
-            # transforms.RandomResizedCrop(224),
             # transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,
@@ -237,8 +235,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(valdir, transforms.Compose([
-            # transforms.Resize(256),
-            # transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])),
@@ -246,7 +242,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate_e(val_loader, model, criterion, args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -311,8 +307,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         losses.update(loss.item(), images.size(0))
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
-        # save train accuracy to "tensorboard1/train"
-        train_dir = os.path.join('tensorboard1', 'train')
+        # save train accuracy to "tensorboard/train"
+        train_dir = os.path.join('tensorboard', 'train')
         train_writer = SummaryWriter(log_dir=train_dir)
         # draw
         train_writer.add_scalar('Acc@5', acc5, epoch)
@@ -361,12 +357,55 @@ def validate(val_loader, model, criterion, epoch, args):
             losses.update(loss.item(), images.size(0))
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
-            # save val accuracy to "tensorboard2/val"
-            val_dir = os.path.join('tensorboard2', 'valid')
+            # save val accuracy to "tensorboard/val"
+            val_dir = os.path.join('tensorboard', 'valid')
             val_writer = SummaryWriter(log_dir=val_dir)
             # draw
             val_writer.add_scalar('Acc@5', acc5, epoch)
             val_writer.add_scalar('loss', loss, epoch)
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                progress.display(i)
+
+        progress.display_summary()
+
+    return top1.avg
+
+
+def validate_e(val_loader, model, criterion, args):
+    batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
+    losses = AverageMeter('Loss', ':.4e', Summary.NONE)
+    top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
+    top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
+    progress = ProgressMeter(
+        len(val_loader),
+        [batch_time, losses, top1, top5],
+        prefix='Test: ')
+
+    # switch to evaluate mode
+    model.eval()
+
+    with torch.no_grad():
+        end = time.time()
+        for i, (images, target) in enumerate(val_loader):
+            if args.gpu is not None:
+                images = images.cuda(args.gpu, non_blocking=True)
+            if torch.cuda.is_available():
+                target = target.cuda(args.gpu, non_blocking=True)
+
+            # compute output
+            output = model(images)
+            loss = criterion(output, target)
+
+            # measure accuracy and record loss
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            losses.update(loss.item(), images.size(0))
+            top1.update(acc1[0], images.size(0))
+            top5.update(acc5[0], images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -460,6 +499,7 @@ def accuracy(output, target, topk=(1,)):
 
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
+        print(pred)
         correct = pred.eq(target.view(1, -1).expand_as(pred))
 
         res = []
@@ -470,5 +510,4 @@ def accuracy(output, target, topk=(1,)):
 
 
 if __name__ == '__main__':
-    # models.resnet18().fc = nn.Sequential(nn.Linear(in_features=512,out_features=200))
     main()
